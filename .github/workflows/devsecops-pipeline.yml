@@ -1,0 +1,51 @@
+name: FraudShield DevSecMLOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  devsecops-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Project Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: DevSec Stage 1 - SAST Static Security Analysis (Bandit)
+        run: |
+          echo "Running Bandit security scan on Python AST..."
+          python -m bandit -r src/ -ll -ii
+
+      - name: DevSec Stage 2 - Dependency Vulnerability Audit
+        run: |
+          echo "Auditing dependencies for known CVE vulnerabilities..."
+          pip-audit || echo "Vulnerability audit finished."
+
+      - name: MLOps Stage 3 - Train Model & Evaluate Quality Gate
+        run: |
+          echo "Executing training pipeline and verifying performance thresholds..."
+          python src/train.py
+
+      - name: DevSec Stage 4 - Run Unit and Security Integrity Tests
+        run: |
+          echo "Running pytest test suite (Model logic + SHA-256 tamper tests)..."
+          pytest tests/ -v
+
+      - name: Ops Stage 5 - Docker Container Build Test
+        run: |
+          echo "Building production Docker container..."
+          docker build -t fraudshield:latest .
